@@ -7,7 +7,7 @@ from aiogram.filters import Command
 from aiogram.types import Message
 
 # Считываем токен из переменных окружения Render или вставляем напрямую
-BOT_TOKEN = os.getenv("BOT_TOKEN" 8755629057:AAGOC5xOJjWKnZJI6AsTu_OJO9yIe3nI8Z0)
+BOT_TOKEN = 8755629057:AAGOC5xOJjWKnZJI6AsTu_OJO9yIe3nI8Z0)
 
 logging.basicConfig(level=logging.INFO)
 
