@@ -1,9 +1,26 @@
-BOT_TOKEN = "8755629057:AAGOC5xOJjWKnZJI6AsT u_OJ09yIe3nI8Z0"
+import os
+import asyncio
+import logging
 import traceback
+from aiogram import Bot, Dispatcher
+
+# Вставьте ваш новый токен или используйте переменную окружения
+BOT_TOKEN = os.getenv("BOT_TOKEN", "8755629057:AAGOC5xOJjWKnZJI6AsT_u_OJ09yIe3nI8Z0")
+
+# Настройка логирования
+logging.basicConfig(level=logging.INFO)
+
+# Инициализация бота и диспетчера
+bot = Bot(token=BOT_TOKEN)
+dp = Dispatcher()
+
+# Здесь подключайте ваши роутеры/хэндлеры, если они в отдельных файлах
+# например: dp.include_router(router)
 
 async def main():
-    # ... ваш существующий код функции main() ...
     print("Бот начинает запуск...")
+    # Удаляем вебхуки, если они были, и запускаем поллинг
+    await bot.delete_webhook(drop_pending_updates=True)
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
