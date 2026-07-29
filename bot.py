@@ -5,7 +5,7 @@ import traceback
 from aiogram import Bot, Dispatcher
 
 # Вставьте ваш новый токен или используйте переменную окружения
-BOT_TOKEN = os.getenv("BOT_TOKEN", "8755629057:AAGOC5xOJjWKnZJI6AsT_u_OJ09yIe3nI8Z0")
+BOT_TOKEN = os.getenv("BOT_TOKEN", "8755629057:AAE9tttO4ouXEjA0Pnd9Nls7P_Cv2N5Rlvw")
 
 # Настройка логирования
 logging.basicConfig(level=logging.INFO)
