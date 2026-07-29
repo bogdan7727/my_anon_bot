@@ -2,24 +2,36 @@ import os
 import asyncio
 import logging
 import traceback
-from aiogram import Bot, Dispatcher
+from aiogram import Bot, Dispatcher, F
+from aiogram.filters import Command
+from aiogram.types import Message
 
-# Вставьте ваш новый токен или используйте переменную окружения
-BOT_TOKEN = os.getenv("BOT_TOKEN", "8755629057:AAE9tttO4ouXEjA0Pnd9Nls7P_Cv2N5Rlvw")
+# Считываем токен из переменных окружения Render или вставляем напрямую
+BOT_TOKEN = os.getenv("BOT_TOKEN", "8755629057:AAGOC5xOJjWKnZJI6AsT_u_OJ09yIe3nI8Z0")
 
-# Настройка логирования
 logging.basicConfig(level=logging.INFO)
 
-# Инициализация бота и диспетчера
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
 
-# Здесь подключайте ваши роутеры/хэндлеры, если они в отдельных файлах
-# например: dp.include_router(router)
+# ------------------- ХЭНДЛЕРЫ (ОБРАБОТЧИКИ) ------------------- #
+
+# 1. Хэндлер для команды /start
+@dp.message(Command("start"))
+async def cmd_start(message: Message):
+    print(f"Получена команда /start от пользователя {message.from_user.id}")
+    await message.answer("Привет! Бот успешно запущен и работает! 🚀")
+
+# 2. Хэндлер для любого другого текста
+@dp.message()
+async def echo_message(message: Message):
+    await message.answer(f"Вы написали: {message.text}")
+
+# ------------------------------------------------------------- #
 
 async def main():
     print("Бот начинает запуск...")
-    # Удаляем вебхуки, если они были, и запускаем поллинг
+    # Сбрасываем старые накопившиеся сообщения, если они были
     await bot.delete_webhook(drop_pending_updates=True)
     await dp.start_polling(bot)
 
