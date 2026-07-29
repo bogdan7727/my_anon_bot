@@ -17,9 +17,9 @@ if not BOT_TOKEN:
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
 
-# Хранилища в памяти приложения
-queue = []        # Очередь пользователей, ищущих собеседника: [user_id_1, user_id_2, ...]
-chats = {}        # Активные комнаты: {user_id_1: user_id_2, user_id_2: user_id_1}
+# Хранилища в памяти
+queue = []        # Очередь поиска
+chats = {}        # Активные диалоги: {user_id: partner_id}
 
 # ==================== КЛАВИАТУРЫ ==================== #
 
@@ -40,10 +40,11 @@ searching_kb = ReplyKeyboardMarkup(
     resize_keyboard=True
 )
 
-# 3. Меню во время общения
+# 3. Меню во время диалога (добавлена кнопка "Следующий" и "Жалоба")
 in_chat_kb = ReplyKeyboardMarkup(
     keyboard=[
-        [KeyboardButton(text="❌ Завершить диалог")]
+        [KeyboardButton(text="➡️ Следующий"), KeyboardButton(text="❌ Завершить")],
+        [KeyboardButton(text="⚠️ Пожаловаться")]
     ],
     resize_keyboard=True
 )
@@ -54,7 +55,7 @@ in_chat_kb = ReplyKeyboardMarkup(
 async def cmd_start(message: Message):
     user_id = message.from_user.id
     
-    # Если пользователь уже в чате или поиске — сбрасываем состояние
+    # Очищаем состояния при старте
     if user_id in queue:
         queue.remove(user_id)
     elif user_id in chats:
@@ -73,54 +74,79 @@ async def cmd_start(message: Message):
 @dp.message(F.text == "ℹ️ О боте")
 async def about_bot(message: Message):
     await message.answer(
-        "🤖 Это анонимный чат.\nНикто из собеседников не увидит ваше имя или ссылку на профиль.",
+        "🤖 Это анонимный чат.\nВсе сообщения и медиафайлы передаются напрямую без раскрытия аккаунта.",
         reply_markup=main_kb
     )
 
-# --- ПОИСК СОБЕСЕДНИКА ---
-@dp.message(F.text == "🔍 Найти собеседника")
-async def start_search(message: Message):
-    user_id = message.from_user.id
-
-    if user_id in chats:
-        await message.answer("Вы уже находитесь в диалоге!", reply_markup=in_chat_kb)
-        return
-
-    if user_id in queue:
-        await message.answer("Вы уже ищете собеседника...", reply_markup=searching_kb)
-        return
-
-    # Проверяем, есть ли кто-то в очереди
+# --- ФУНКЦИЯ ПОИСКА ---
+async def search_partner(user_id: int, message: Message):
     if queue:
         partner_id = queue.pop(0)
         
-        # Соединяем пользователей в парную структуру
+        # Связываем пару
         chats[user_id] = partner_id
         chats[partner_id] = user_id
 
-        # Оповещаем обоих
         await message.answer("🎉 **Собеседник найден!** Приятного общения.", reply_markup=in_chat_kb, parse_mode="Markdown")
         await bot.send_message(partner_id, "🎉 **Собеседник найден!** Приятного общения.", reply_markup=in_chat_kb, parse_mode="Markdown")
     else:
         queue.append(user_id)
         await message.answer("🔎 **Ищем свободного собеседника...**", reply_markup=searching_kb, parse_mode="Markdown")
 
-# --- ОСТАНОВКА ПОИСКА ---
+@dp.message(F.text == "🔍 Найти собеседника")
+async def start_search_handler(message: Message):
+    user_id = message.from_user.id
+    if user_id in chats:
+        await message.answer("Вы уже находитесь в диалоге!", reply_markup=in_chat_kb)
+        return
+    if user_id in queue:
+        await message.answer("Вы уже ищете собеседника...", reply_markup=searching_kb)
+        return
+
+    await search_partner(user_id, message)
+
+# --- КНОПКА "СЛЕДУЮЩИЙ СОБЕСЕДНИК" ---
+@dp.message(F.text == "➡️ Следующий")
+async def next_partner(message: Message):
+    user_id = message.from_user.id
+
+    if user_id in chats:
+        partner_id = chats.pop(user_id)
+        chats.pop(partner_id, None)
+        await bot.send_message(partner_id, "Собеседник перешел к новому поиску.", reply_markup=main_kb)
+    elif user_id in queue:
+        queue.remove(user_id)
+
+    await search_partner(user_id, message)
+
+# --- КНОПКА "ПОЖАЛОВАТЬСЯ" ---
+@dp.message(F.text == "⚠️ Пожаловаться")
+async def report_partner(message: Message):
+    user_id = message.from_user.id
+
+    if user_id in chats:
+        partner_id = chats.pop(user_id)
+        chats.pop(partner_id, None)
+
+        await message.answer("Ваша жалоба принята. Диалог завершен.", reply_markup=main_kb)
+        await bot.send_message(partner_id, "На вас поступила жалоба. Диалог принудительно завершен.", reply_markup=main_kb)
+        
+        # Автоматически запускаем поиск нового собеседника для пожаловавшегося
+        await search_partner(user_id, message)
+    else:
+        await message.answer("У вас нет активного диалога.", reply_markup=main_kb)
+
+# --- ОСТАНОВКА ПОИСКА И ЗАВЕРШЕНИЕ ---
 @dp.message(F.text == "🛑 Остановить поиск")
 async def stop_search(message: Message):
     user_id = message.from_user.id
-
     if user_id in queue:
         queue.remove(user_id)
         await message.answer("Поиск остановлен.", reply_markup=main_kb)
-    else:
-        await message.answer("Вы не находились в поиске.", reply_markup=main_kb)
 
-# --- ЗАВЕРШЕНИЕ ДИАЛОГА ---
-@dp.message(F.text == "❌ Завершить диалог")
+@dp.message(F.text == "❌ Завершить")
 async def stop_dialog(message: Message):
     user_id = message.from_user.id
-
     if user_id in chats:
         partner_id = chats.pop(user_id)
         chats.pop(partner_id, None)
@@ -130,7 +156,7 @@ async def stop_dialog(message: Message):
     else:
         await message.answer("У вас нет активного диалога.", reply_markup=main_kb)
 
-# --- ПЕРЕСЫЛКА СООБЩЕНИЙ В ЧАТЕ ---
+# --- ПЕРЕСЫЛКА ЛЮБЫХ СООБЩЕНИЙ ---
 @dp.message()
 async def relay_message(message: Message):
     user_id = message.from_user.id
@@ -138,17 +164,16 @@ async def relay_message(message: Message):
     if user_id in chats:
         partner_id = chats[user_id]
         try:
-            # Пересылаем копию сообщения собеседнику (текст, фото, голос и т.д.)
             await message.copy_to(chat_id=partner_id)
-        except Exception as e:
-            await message.answer("Не удалось отправить сообщение собеседнику.")
+        except Exception:
+            await message.answer("Не удалось доставить сообщение.")
     else:
         await message.answer("Чтобы начать общаться, нажмите «🔍 Найти собеседника».", reply_markup=main_kb)
 
 # ==================== ЗАПУСК ==================== #
 
 async def main():
-    print("Анонимный чат-бот успешно запущен...")
+    print("Бот обновлен и запущен...")
     await bot.delete_webhook(drop_pending_updates=True)
     await dp.start_polling(bot)
 
